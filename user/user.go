@@ -6,25 +6,27 @@ import (
 )
 
 type User struct {
-	ID   string `json:"id"`
+	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-type Users map[string]*User
+type Users []*User
 
-func (u Users) GetUser(ctx context.Context, id string) (*User, error) {
-	user, exists := u[id]
-	if !exists {
-		return nil, fmt.Errorf("user with ID %s not found", id)
+func (u *Users) GetUser(ctx context.Context, id int) (*User, error) {
+	user := (*u)[id]
+	if user == nil {
+		return nil, fmt.Errorf("user with ID %d not found", id)
 	}
 	return user, nil
 }
 
-func (u Users) CreateUser(ctx context.Context, user *User) (*User, error) {
-	if _, exists := u[user.ID]; exists {
-		return nil, fmt.Errorf("user with ID %s already exists", user.ID)
+func (u *Users) CreateUser(ctx context.Context, name string) (*User, error) {
+	id := len(*u) + 1
+	user := &User{
+		ID:   id,
+		Name: name,
 	}
-	u[user.ID] = user
+	*u = append(*u, user)
 	return user, nil
 }
 
@@ -34,41 +36,33 @@ type CreateUserRequest struct {
 type CreateUserResponse User
 
 type UserRepository interface {
-	CreateUser(ctx context.Context, user *User) (*User, error)
-	GetUser(ctx context.Context, id string) (*User, error)
+	CreateUser(ctx context.Context, name string) (*User, error)
+	GetUser(ctx context.Context, id int) (*User, error)
 }
 
 var user_repository UserRepository
 
 func init() {
-	user_repository = make(Users)
+	user_repository = &Users{}
 }
 
 //encore:api public method=POST path=/user
-func CreateUser(ctx context.Context, params *CreateUserRequest) (*CreateUserResponse, error) {
-	user := &CreateUserResponse{
-		ID:   "1",
-		Name: params.Name,
-	}
-
-	createdUser, err := user_repository.CreateUser(ctx, &User{
-		ID:   user.ID,
-		Name: user.Name,
-	})
+func CreateUser(ctx context.Context, params *CreateUserRequest) (*User, error) {
+	createdUser, err := user_repository.CreateUser(ctx, params.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
-	return (*CreateUserResponse)(createdUser), nil
+	return createdUser, nil
 }
 
 //encore:api public method=GET path=/user/:id
-func GetUser(ctx context.Context, id string) (*User, error) {
+func GetUser(ctx context.Context, id int) (*User, error) {
 	user, err := user_repository.GetUser(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	if user == nil {
-		return nil, fmt.Errorf("user with ID %s not found", id)
+		return nil, fmt.Errorf("user with ID %d not found", id)
 	}
 	return user, nil
 }
